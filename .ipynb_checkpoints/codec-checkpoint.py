@@ -6,6 +6,7 @@ import rle
 import zlib
 from skimage.util import view_as_blocks
 from skimage.color import rgb2ycbcr, ycbcr2rgb
+import cv2
 
 
 # given an image, return image in YCbCr color space
@@ -41,6 +42,7 @@ def rgb_to_YCbCr(img_array):
 
 def YCbCr_to_rgb(channel_array):
 
+
     inv_matrix = np.matrix(
     [[65.481, 128.553, 24.966], 
      [-37.797, -74.203, 112.0], 
@@ -49,10 +51,16 @@ def YCbCr_to_rgb(channel_array):
     conv_matrix = np.linalg.inv(inv_matrix)
 
     img = np.transpose(np.asarray(channel_array), (1, 2, 0))
-    
+
+    #img = np.round(img).astype(np.uint16)
+
+
     img[..., 0] -= 16
     img[..., 1] -= 128
     img[..., 2] -= 128
+
+    print(img.min())
+    print(img.max())
     
     # reshape to do matrix multiplication across color channels easier
     img_reshape = np.reshape(img, (img.shape[0] * img.shape[1], img.shape[2]))
@@ -79,7 +87,7 @@ def calculate_downsampling_ratios(ratio):
     elif ratio == "4:2:2":
         return [(1,1), (2,1), (2,1)] # obviously change if i want new ratios
     else:
-        return [(1,1), (8,8), (8,8)]
+        return [(1,1), (4,4), (4,4)]
 
 
 
@@ -87,7 +95,8 @@ def downscale_colors(channel, **kwargs):
     i = kwargs["index"]
     ratio = kwargs["downsample_ratio"]
     factors = calculate_downsampling_ratios(ratio)[i]
-    
+    print(np.std(channel))
+    print(channel.max())
     return channel[::factors[1], ::factors[0]]
 
 
@@ -97,8 +106,14 @@ def rescale_colors(channel, **kwargs):
     i = kwargs["index"]
     ratio = kwargs["downsample_ratio"]
     factors = calculate_downsampling_ratios(ratio)[i]
-    
-    return np.repeat(np.repeat(channel, factors[0], axis=1), factors[1], axis=0)
+    original_shape = (channel.shape[1] * factors[0], channel.shape[0] * factors[1])
+    resized = cv2.resize(channel, original_shape, interpolation=cv2.INTER_LINEAR)
+    print(np.std(resized))
+    print(channel.max())
+    return resized
+
+    # Upsample using bilinear interpolation
+    #return np.repeat(np.repeat(channel, factors[0], axis=1), factors[1], axis=0)
 
 
 
