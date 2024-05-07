@@ -32,17 +32,33 @@ def rgb_to_YCbCr(img_array):
     # go back to original shape
     converted = np.reshape(np.asarray(converted_reshaped), img.shape)
 
+    #print(converted.min())
+    #print(converted.max())
+
+   # print("----")
     Y = converted[..., 0] + 16
     Cb = converted[..., 1] + 128
     Cr = converted[..., 2] + 128
-
+    '''print(Y.min())
+    print(Y.max())
+    print(Cb.min())
+    print(Cb.max())
+    print(Cr.min())
+    print(Cr.max())
     
+    print("----") '''
     return (Y, Cb, Cr)
 
 
 def YCbCr_to_rgb(channel_array):
 
-
+    '''print(channel_array[0].min())
+    print(channel_array[0].max())
+    print(channel_array[1].min())
+    print(channel_array[1].max())
+    print(channel_array[2].min())
+    print(channel_array[2].max())
+    print("----")  '''
     inv_matrix = np.matrix(
     [[65.481, 128.553, 24.966], 
      [-37.797, -74.203, 112.0], 
@@ -59,9 +75,6 @@ def YCbCr_to_rgb(channel_array):
     img[..., 1] -= 128
     img[..., 2] -= 128
 
-    print(img.min())
-    print(img.max())
-    
     # reshape to do matrix multiplication across color channels easier
     img_reshape = np.reshape(img, (img.shape[0] * img.shape[1], img.shape[2]))
 
@@ -86,6 +99,8 @@ def calculate_downsampling_ratios(ratio):
         return [(1,1), (2,2), (2,2)]
     elif ratio == "4:2:2":
         return [(1,1), (2,1), (2,1)] # obviously change if i want new ratios
+    elif ratio == "4:4:4":
+        return [(1,1), (1,1), (1,1)]
     else:
         return [(1,1), (4,4), (4,4)]
 
@@ -95,8 +110,6 @@ def downscale_colors(channel, **kwargs):
     i = kwargs["index"]
     ratio = kwargs["downsample_ratio"]
     factors = calculate_downsampling_ratios(ratio)[i]
-    print(np.std(channel))
-    print(channel.max())
     return channel[::factors[1], ::factors[0]]
 
 
@@ -108,8 +121,7 @@ def rescale_colors(channel, **kwargs):
     factors = calculate_downsampling_ratios(ratio)[i]
     original_shape = (channel.shape[1] * factors[0], channel.shape[0] * factors[1])
     resized = cv2.resize(channel, original_shape, interpolation=cv2.INTER_LINEAR)
-    print(np.std(resized))
-    print(channel.max())
+
     return resized
 
     # Upsample using bilinear interpolation
@@ -119,33 +131,33 @@ def rescale_colors(channel, **kwargs):
 
 def form_blocks(channel, **kwargs):
     block_size = kwargs['block_size']
-
-    return view_as_blocks(channel, (block_size, block_size))
+    
+    return view_as_blocks(np.round(channel) / 255, (block_size, block_size))
 
 
 
 def reconstruct_blocks(channel, **kwargs):
     block_size = kwargs['block_size']
-
+    channel *= 255
     shape = (channel.shape[0] * block_size, channel.shape[1] * block_size)
     wrong_order = np.transpose(channel,axes=(0,2,1,3)) # i have no clue why this works but my intuition told me to do it
     new_channel = wrong_order.reshape(shape)
 
-    return new_channel
+    return new_channel 
 
 
 
 def calculate_blocked_dct(channel, **kwargs):
-    channel -= 128 # want the whole thing centered at 0
+    channel -= 0.5 # want the whole thing centered at 0
     dct = scipy.fftpack.dctn(channel, axes=(-2,-1))
-    
+
     return dct
 
 
 
 def inverse_block_dct(channel, **kwargs):
     idct = scipy.fftpack.idctn(channel, axes=(-2,-1))
-    idct += 128 # recenter to fit range
+    idct += 0.5 # recenter to fit range
     
     return idct
 
@@ -154,6 +166,12 @@ def inverse_block_dct(channel, **kwargs):
 def calculate_quantization_matrix(quality):
     #https://stackoverflow.com/questions/29215879/how-can-i-generalize-the-quantization-matrix-in-jpeg-compression
     # as specified in JPEG standard
+
+    # should be defined between 0 and 100 but right now anything outside of (20,97) works pretty terrible.
+    # so we will first shift all values to be within that range 
+    quality = quality * 0.77 + 20
+
+    
     default = np.array([
     [16, 11, 10, 16, 24, 40, 51, 61],
     [12, 12, 14, 19, 26, 58, 60, 55],
@@ -177,7 +195,7 @@ def quantize(channel, **kwargs):
     quality = kwargs['q']
     matrix = 1 / calculate_quantization_matrix(quality)
     result = channel * matrix[np.newaxis, np.newaxis, :, :]
-    int_result = result.astype(np.int16) 
+    int_result = result.astype(np.int8) 
 
     return int_result
 
