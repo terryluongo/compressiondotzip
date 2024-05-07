@@ -190,11 +190,55 @@ def calculate_quantization_matrix(quality):
     return modified.astype(np.uint8)
 
 
+def dynamic_quality(s,q):
+    if q < 20:
+        range = (0, 2 * q)
+    elif q > 80:
+        range = (2 * q - 100, 100)
+    else:
+        range = (q - 20, q + 20)
+    
+    low, high = range
+    return low + (s * (high - low)) / 255
+
+    
+
+
+
 
 def quantize(channel, **kwargs):
     quality = kwargs['q']
-    matrix = 1 / calculate_quantization_matrix(quality)
-    result = channel * matrix[np.newaxis, np.newaxis, :, :]
+    dynamic = kwargs['dynamic']
+    q_array = kwargs['q_array']
+    i = kwargs["index"]
+    ratio = kwargs["downsample_ratio"]
+    factors = calculate_downsampling_ratios(ratio)[i]
+
+    
+    if dynamic:
+        if factors != (1, 1):
+            # Calculate the number of rows and columns in the new array
+            new_rows = q_array.shape[0] // factors[0]
+            new_columns = q_array.shape[1] // factors[1]
+            reshaped_array = q_array[:new_rows*2, :new_columns*2].reshape(new_rows, 2, new_columns, 2)
+            q_array = np.mean(reshaped_array, axis=(1, 3))
+
+        q_array_standardized = dynamic_quality(q_array, quality) # shift q_array to qualities between 0 and 100
+        
+        #vectorized_quantize = np.vectorize(calculate_quantization_matrix)
+        #quantize_array = vectorized_quantize(q_array_standardized) # make 4D array of quantization tables based on saliency and quality
+
+        quantize_array = [[calculate_quantization_matrix(q) for q in row] for row in q_array_standardized]
+        quantize_array = np.array(quantize_array)
+        
+        matrix = 1 / quantize_array
+        result = channel * matrix
+        
+    else:
+        matrix = 1 / calculate_quantization_matrix(quality)
+        
+        result = channel * matrix[np.newaxis, np.newaxis, :, :]
+        
     int_result = result.astype(np.int8) 
 
     return int_result
@@ -203,8 +247,33 @@ def quantize(channel, **kwargs):
 
 def dequantize(channel, **kwargs):
     quality = kwargs['q']
-    matrix = calculate_quantization_matrix(quality)
-    result = channel * matrix[np.newaxis, np.newaxis, :, :]
+    dynamic = kwargs['dynamic']
+    q_array = kwargs['q_array']
+    i = kwargs["index"]
+    ratio = kwargs["downsample_ratio"]
+    factors = calculate_downsampling_ratios(ratio)[i]
+
+    
+    if dynamic:
+        if factors != (1, 1):
+            new_rows = q_array.shape[0] // factors[0]
+            new_columns = q_array.shape[1] // factors[1]
+            reshaped_array = q_array[:new_rows*2, :new_columns*2].reshape(new_rows, 2, new_columns, 2)
+            q_array = np.mean(reshaped_array, axis=(1, 3))
+
+        q_array_standardized = dynamic_quality(q_array, quality) # shift q_array to qualities between 0 and 100
+        
+        #vectorized_quantize = np.vectorize(calculate_quantization_matrix)
+        #matrix = vectorized_quantize(q_array_standardized) # make 4D array of quantization tables based on saliency and quality
+
+        quantize_array = [[calculate_quantization_matrix(q) for q in row] for row in q_array_standardized]
+        matrix = np.array(quantize_array)
+        
+        result = channel * matrix
+        
+    else:
+        matrix = calculate_quantization_matrix(quality)
+        result = channel * matrix[np.newaxis, np.newaxis, :, :]
     
     return result
 

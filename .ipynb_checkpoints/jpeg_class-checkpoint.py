@@ -8,16 +8,20 @@ import os
 import pickle
 from skimage.util import view_as_blocks
 from skimage.color import rgb2ycbcr, ycbcr2rgb
+import saliency
 import codec
 
 import importlib
 importlib.reload(codec)
+importlib.reload(saliency)
 
 
 
 
 class JPEG:
     def __init__(self, img_array, q, block_size = 8, downsample_ratio = "4:2:0", dynamic = False):
+        # could have sensitivity to saliency be a parameter
+        # could have type of saliency be a parameter
         self.img_array = img_array
         self.block_size = block_size
         self.downsample_ratio = downsample_ratio
@@ -27,13 +31,13 @@ class JPEG:
         # how is dynamic quantization going to work?  channel wise or should i do it with a single grayscale array
         # probably that, would save the most space
         # how to deal with downsampling in Cb and Cr channels?
-        self.q_array = None
+        self.q_array = saliency.std_LoG_view(img_array) if dynamic else None
         self.q = q
         self.Y = None
         self.Cb = None
         self.Cr = None
 
-
+        
     # makes/displays img array
     def show_image(self):
         plt.imshow(self.img_array)
@@ -111,7 +115,8 @@ class JPEG:
         self.Y, self.Cb, self.Cr = codec.rgb_to_YCbCr(self.img_array)
         
         functions = [codec.downscale_colors, codec.form_blocks, codec.calculate_blocked_dct, codec.quantize, codec.zigzag]
-        kwargs = {"block_size": self.block_size, "q": self.q, "downsample_ratio": self.downsample_ratio}
+        kwargs = {"block_size": self.block_size, "q": self.q, "downsample_ratio": self.downsample_ratio, 
+                  "dynamic": self.dynamic, "q_array": self.q_array}
         
         for f in functions[: max_step - 1]:
             self.process_channels(f, **kwargs)
@@ -121,7 +126,8 @@ class JPEG:
     def decode(self, from_step = 6):
 
         functions = [codec.rescale_colors, codec.reconstruct_blocks, codec.inverse_block_dct, codec.dequantize, codec.unzigzag]
-        kwargs = {"block_size": self.block_size, "q": self.q, "downsample_ratio": self.downsample_ratio}
+        kwargs = {"block_size": self.block_size, "q": self.q, "downsample_ratio": self.downsample_ratio, 
+                  "dynamic": self.dynamic, "q_array": self.q_array}
         
         while from_step > 1:
             self.process_channels(functions[from_step - 2], **kwargs)
@@ -136,6 +142,7 @@ class JPEG:
         # Return a dictionary containing only the attributes you want to pickle
         return {'q': self.q, 'block_size': self.block_size, 
                 'downsample_ratio': self.downsample_ratio, 
+                'dynamic': self.dynamic, 'q_array': self.q_array,
                 'Y': self.Y, 'Cb': self.Cb, 'Cr': self.Cr}
 
 
@@ -145,6 +152,8 @@ class JPEG:
         self.q = state['q']
         self.block_size = state['block_size']
         self.downsample_ratio = state['downsample_ratio']
+        self.dynamic = state['dynamic']
+        self.q_array = state['q_array']
         self.Y = state['Y']
         self.Cb = state['Cb']
         self.Cr = state['Cr']
