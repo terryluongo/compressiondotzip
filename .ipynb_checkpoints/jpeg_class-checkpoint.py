@@ -37,32 +37,12 @@ class JPEG:
         self.Cb = None
         self.Cr = None
 
-        
+   
     # makes/displays img array
     def show_image(self):
         plt.imshow(self.img_array)
 
-
-    
-    # saves to binary, compresses
-    def save_image(self, filename):
-        pickled_data = pickle.dumps(self)
-        compressed_data = zstd.compress(pickled_data)
-        with open(filename, 'wb') as f:
-            f.write(compressed_data)
-
-
-    
-    def load_image(filename):
-        with open(filename, 'rb') as f:
-            compressed = f.read()
-    
-        decompressed = zstd.decompress(compressed)
-        data = pickle.loads(decompressed)
-
-        return data
-
-
+            
     
     def compare_image(self, img):
         fig, axs = plt.subplots(1, 2)
@@ -135,6 +115,23 @@ class JPEG:
 
         self.img_array = codec.YCbCr_to_rgb([self.Y, self.Cb, self.Cr])
 
+
+    # saves to binary, compresses
+    def save_image(self, filename):
+        pickled_data = pickle.dumps(self)
+        compressed_data = zstd.compress(pickled_data)
+        with open(filename, 'wb') as f:
+            f.write(compressed_data)
+
+    
+    def load_image(filename):
+        with open(filename, 'rb') as f:
+            compressed = f.read()
+    
+        decompressed = zstd.decompress(compressed)
+        data = pickle.loads(decompressed)
+
+        return data
 
     
     # use these to I only pickle what is necessary.  otherwise it wouldn't save space at all

@@ -32,33 +32,16 @@ def rgb_to_YCbCr(img_array):
     # go back to original shape
     converted = np.reshape(np.asarray(converted_reshaped), img.shape)
 
-    #print(converted.min())
-    #print(converted.max())
-
    # print("----")
     Y = converted[..., 0] + 16
     Cb = converted[..., 1] + 128
     Cr = converted[..., 2] + 128
-    '''print(Y.min())
-    print(Y.max())
-    print(Cb.min())
-    print(Cb.max())
-    print(Cr.min())
-    print(Cr.max())
-    
-    print("----") '''
+
     return (Y, Cb, Cr)
 
 
 def YCbCr_to_rgb(channel_array):
 
-    '''print(channel_array[0].min())
-    print(channel_array[0].max())
-    print(channel_array[1].min())
-    print(channel_array[1].max())
-    print(channel_array[2].min())
-    print(channel_array[2].max())
-    print("----")  '''
     inv_matrix = np.matrix(
     [[65.481, 128.553, 24.966], 
      [-37.797, -74.203, 112.0], 
@@ -67,9 +50,6 @@ def YCbCr_to_rgb(channel_array):
     conv_matrix = np.linalg.inv(inv_matrix)
 
     img = np.transpose(np.asarray(channel_array), (1, 2, 0))
-
-    #img = np.round(img).astype(np.uint16)
-
 
     img[..., 0] -= 16
     img[..., 1] -= 128
@@ -123,9 +103,6 @@ def rescale_colors(channel, **kwargs):
     resized = cv2.resize(channel, original_shape, interpolation=cv2.INTER_LINEAR)
 
     return resized
-
-    # Upsample using bilinear interpolation
-    #return np.repeat(np.repeat(channel, factors[0], axis=1), factors[1], axis=0)
 
 
 
@@ -203,9 +180,6 @@ def dynamic_quality(s,q):
 
     
 
-
-
-
 def quantize(channel, **kwargs):
     quality = kwargs['q']
     dynamic = kwargs['dynamic']
@@ -225,9 +199,6 @@ def quantize(channel, **kwargs):
 
         q_array_standardized = dynamic_quality(q_array, quality) # shift q_array to qualities between 0 and 100
         
-        #vectorized_quantize = np.vectorize(calculate_quantization_matrix)
-        #quantize_array = vectorized_quantize(q_array_standardized) # make 4D array of quantization tables based on saliency and quality
-
         quantize_array = [[calculate_quantization_matrix(q) for q in row] for row in q_array_standardized]
         quantize_array = np.array(quantize_array)
         
@@ -263,9 +234,6 @@ def dequantize(channel, **kwargs):
 
         q_array_standardized = dynamic_quality(q_array, quality) # shift q_array to qualities between 0 and 100
         
-        #vectorized_quantize = np.vectorize(calculate_quantization_matrix)
-        #matrix = vectorized_quantize(q_array_standardized) # make 4D array of quantization tables based on saliency and quality
-
         quantize_array = [[calculate_quantization_matrix(q) for q in row] for row in q_array_standardized]
         matrix = np.array(quantize_array)
         
