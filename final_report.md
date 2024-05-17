@@ -10,7 +10,7 @@ It is from this abstracted understanding that an array (no pun intended) of ques
 
 1. What can we learn about information extracted from a digital image and
 
-2. How can we use the information we extract from an image to ___ apply some transformation to that same image?
+2. How can we use the information we extract from an image to dynamically apply some transformation to that same image?
 
 #### Understanding JPEG Through the Lens of Data
 
