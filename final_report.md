@@ -10,7 +10,7 @@ It is from this abstracted understanding that an array (no pun intended) of ques
 
 1. What can we learn about information extracted from a digital image and
 
-2. How can we use the information we extract from an image to dynamically apply some transformation to that same image?
+2. How can we use the information we extract from an image to ___ apply some transformation to that same image?
 
 #### Understanding JPEG Through the Lens of Data
 
@@ -64,7 +64,7 @@ From this point, we made the choose to expand our exploration of saliency of sal
 
 ### **Methods**:
 
-### Step 1: Implementing Basic JPEG Algorithm
+#### Step 1: Implementing Basic JPEG Algorithm
 
 The first step was to implement the basic JPEG algorithm. Terry created a codec file which included a function definition for each method required in both JPEG compression and decompression. By defining our own methods for each step of the process, we had the advantage of both A. getting a detailed understanding of the algorithm before adjusting it and B. being able to make later additions/changes to our algorithm to help us dynamically adjust quantization. Terry then created a JPEG class file which image files could be loaded, and run through the methods defined in the CODEC file.
 
@@ -103,10 +103,82 @@ Example. Steps 2 and 3 Illustratred Intuitively:
 
 #### Step 4: Dynamically Adjusting Quantization
 
-*FOR JIFFY: once you explain the part about calculating the quantization coefficient I can def explain this so you don't have to worry about it. I'll also include one of those intuitive explanations.
+The question then arrived of what we would do with these value arrays? Thankfully, we knew what they represented! Each value corresponds to the intensity of a certain image feature that we might want to adjust quantization around. For example - as mentioned above - the saliency map of an image highlights the "most important" part of the image from which it is created. So, a high mean luminance of a saliency map's region may suggest that that region contains a lot of important information that we may not want to lose. A block's standard deviation of luminance can inform us similarly. A high standard deviation may suggest that there are various degrees of detail in an image block which we may not want to lose. So, when we ultimately compress our image, we want to somehow create a way to check how bright the saliency block is, and subsequently minimize the quantization factor applied to it during compression. 
+
+Knowing thus what each of our values represented, we created dynamic quantization methods which first took the final salient version of the image to be compressed, and assigned a 'quality value' between [0-100] to each of the image blocks based on the final quality percentage we wanted our compressed image to be compared to our original. I know, very confusing and a lot of 'quality'. But, I'll clarify by a lovely narrative example:
+
+Remember the 8x8 block that created above for our DCT transformed image? We now imagine we perform that same process on a saliency map of our image. Still 8x8 blocks, but now each block holds the mean luminance value of that all the pixels within it. Now, we want to perform a JPEG compression on our original image, but base the quantization off of these means values. First, we select a quality for our final image. 90% sounds good: our final image should be 80% of the quality of our original image based on our algorithm. How is this different from 90%? In an 90% compression, there are a lot more frequencies we want to keep Our final image should resemble the image without distortion, so we keep more frequencies and only throw away the details that are really, really not necessary. So, knowing we want 90% quality, we send our 8x8 block through a function which assigns each block a quality value between [0-100] based on that blocks average luminance. The higher the brightness, the higher quality that block is assigned. And, since we want to retain a lot more information with 90% compression - compared to, say, a 40% quality compression - our function is willing to dish out a lot more high quality scores: there is a much bigger range of frequencies that it wants to keep safe from compression. As we drop our final output image quality, our function algorithmically restricts the range of mean luminance values it is willing to give a high score. This ultimately will lead to more frequencies being lost, and a lower quality output image.
+
+Now we have an 8x8 block where each block has a value between [0-100] in each block, with 100 marking a perfect amount of quality - don't lose any of this information! - and 0 marking no quality at all - you can lose every bit of information in this block. We then pass this array through a function which will iteratre through each of the 8x8 blocks, and calculate a quantization matrix according to that blocks quality score. Each matrix will be used to quantize its corresponding block in our original image. However, instead of the same quantization matrix being used across an entire image, we will now have a custom quantization matrix for each 8x8 region which minimizes or maximizes a local quantization based on that block's quality score. So, all those blocks that got higher and higher quality will produce matrices that quantize less and less frequencies. And, all those blocks that were assigned low and lower quality scores will increase the degree of quantization on their corresponding image block. These distinct quantization matrices are then applied to our to-be-compressed image, and the rest of the JPEG algorithm follows suit.
 
 
+### **Results**:
+
+To break the bad news early, our results were not very favorable for dynamic quantization as we have it currently programmed. We employed both visual and quantitaive measures to see how we and the numbers felt the images compressed with dynamic quantization compared to those compressed with fixed quantization. You can find all the metrics we compared and how we adjusted paramters to do so in the 'jpeg.ipynb' file in our repository. To provide a working example of wthe measures we explored I can highlight the results of a specific saliency method: the Standard Deviation of a DoG/LoG with a Gaussian pre-filter sigma of 5, and compression quality of 80%.
+
+<p align="center">
+<br>
+    <img src="all_plots/std_LoG/og_v_recon_ryan_80.png" align = "center" width="700" height="500">
+</p>
+<br>
+
+As we can see from the plotted images, our algorithm does on a purely visual level what we expect a JPEG compression algorithm to do. At 80% compression, We have clearly lost color information - albeit more than we may have hoped - as well as reduced visual resolution - as can be seen from the distortive aliasing which is apparent around the output image.
+
+<br>
+<p align="center">
+<img src="all_plots/std_LoG/fix_v_dyn_ryan_80.png" alt = "" width="700" height="500">
+</p>
+<br>
+
+Our next result came from visually comparing the result of 80% compression of our image using both fixed and dynamic quantization. As you can see, both fixed and dynamic quantization seem to subsample the same amount of color data from our original image. The biggest difference comes in the clarity of the output image. With fixed quantization, there are no spatial distortions being clearly introduced at 80% compression. With dynamic quantization, we notice the same blotchy patches on Ryan's left shoulder (our right), as well as some distortion on his face.
+
+<br>
+<p align="center">
+<img src="all_plots/std_LoG/qual_v_size_80.png" alt = "" width="700" height="500">
+</p>
+<br>
+
+One of the areas where dynamic quantization works best - at least with the LoG standard deviation method - is the relationship between image quality and filesize. As seen by the graph, dynamic quantization actually resulted in  filesizes which were a smaller percentage of the original image size for high and mid-quality images.
+
+<br>
+<p align="center">
+<img src="all_plots/std_LoG/qual_v_ssim_80.png" alt = "" width="700" height="500">
+</p>
+<br>
+
+On of the weakest points of dynamic quantization's performance is when it comes to comparing JPEQ quality and SSIM values. SSIM stands for the Structural Similarity Index Measure, and is used to try and quantify how good the perceptive/visual quality of an image is. As shown by the graph, images compressed using dynamic quantization lose quality more steeply as JPEG quality decreases. A 100% quality JPEG and 60% quality JPEG, compressed using fixed quantization, have respective SSIMs of just over 0.70 and just over 0.40 when compared with our original image. If you look at the same quality JPEG compressions using dynamic compression, we see a drop from an SSIM just over 0.70 to just over 0.35 when compared with out original image.
+
+<br>
+<p align="center">
+<img src="all_plots/std_LoG/size_v_ssim_80.png" alt = "" width="700" height="500">
+</p>
+<br>
+
+The final measure we looked at was Filesive vs. SSIM. In other words, do compressed images of the same size look better if they have used fixed quantization or dynamic quantization? Again, dynamic quantization was beat out by fixed quantization. While both follow a similar trend on the graph, the SSIM values for dynamically quantized JPEGs are consistently lower those produced by fixed quantization and of equivalent filesize.
 
 
+### **Accessibility**
+
+With the proper implementation and effective education, we do believe this algorithm is accessible. In it's current form we don;t believe it is necessarily the easiest to use or understand for those not well-versed in concepts of image frequency, compression algorithms, and saliency detection. Removing the need for hard-coding the compression, and replacing the algorithm steps with an intuitive, well-detailed, and user-friendly would make this a fun exploration for anyone interested in how digital images work and how/why we modify them.
 
 
+### **Ethical Implications**
+
+The ethical implications of JPEG compression fall under the umbrella of lossy compression algorithms in general. In certain fields of digital image processing - particularly those that require very high-resolution imaging - experts suggest avoiding JPEG compression as much as possible. This is because - as seen above - the algorithm causes changes in resolution AND the intensity value of any given pixel in an image. If this goes too far, one might lose crucial details needed to analyze the image.
+
+This is also, however, where we hope our algorithm could be of use (if most productively implemented). By making quantization - being the step of JPEG compression that decides how much/what information will be lost - dynamic, we can emphasize quantization on the 'less important' regions of an image so as to reduce the loss of detail in the image's more salient regions. In doing so, a dynamic approach to JPEG compression could help us retain an image's integrity at higher degrees of compression.
+
+### **Schedule**
+<p align="center">
+<br>
+    <img src="all_plots/schedule/og_schedule.jpg" align = "center" width="530" height="550">
+    <img src="all_plots/schedule/rev_sched.jpg" align = "center" width="500" height="550">
+</p>
+<br>
+
+Our original schedule did not have a distinct vision for what the goal of our project was. We originally presented it as an exploration of JPEG compression, and early on had the idea to see how the algorithm could be optimized for different subclasses of images. This was what we originally planned our schedule around: we would learn about the algorithm on the whole first, then identify subclasses that could benefit from an optimized JPEG compression algorithm, and them implement the necessary optimizations.That middle idea is what changed the most. Terry spent the first week implementing an version of a JPEG algorithm which we could play with and customize as needed. Then, Jiffy spent the second week of the project trying to identify a specific step of the JPEG algorithm to modify - quantization - and how/on what grounds we could modify this process - adjusting quantization based on saliency metrics. From there Jiffy wrote the code to calculate those metrics in a way that could make them more easily accessed by during quantization. With these methods, Terry worked to build the bridge between saliency and JPEG by creating and applying dynamic quantization methods to our compression algorithm. We then worked jointly on the presentation and this report, bringing what we learned to eachother trying to convey it in a productive manner.
+
+
+### **Issues**
+### **Future Work**
+### **References**
