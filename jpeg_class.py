@@ -19,19 +19,37 @@ importlib.reload(saliency)
 
 
 class JPEG:
-    def __init__(self, img_array, q, block_size = 8, downsample_ratio = "4:2:0", dynamic = False):
+    def __init__(self, img_array, q, block_size = 8, downsample_ratio = "4:2:0", dynamic = False, dMode = False):
         # could have sensitivity to saliency be a parameter
         # could have type of saliency be a parameter
         self.img_array = img_array
         self.block_size = block_size
         self.downsample_ratio = downsample_ratio
         self.dynamic = dynamic
+        self.dMode = dMode
 
 
         # how is dynamic quantization going to work?  channel wise or should i do it with a single grayscale array
         # probably that, would save the most space
         # how to deal with downsampling in Cb and Cr channels?
-        self.q_array = saliency.std_LoG_view(img_array) if dynamic else None
+        if dynamic:
+            if dMode == "std_LoG":
+                self.q_array = saliency.std_LoG_view(img_array)
+            elif dMode == "mean_LoG":
+                self.q_array = saliency.mean_LoG_view(img_array)
+            elif dMode == "std_saliency":
+                self.q_array = saliency.std_saliency_view(img_array)
+            elif dMode == "mean_saliency":
+                self.q_array = saliency.mean_saliency_view(img_array)
+            elif dMode == "std_dct":
+                self.q_array = saliency.std_dct_view(img_array)
+            elif dMode == "mean_dct":
+                self.q_array = saliency.mean_dct_view(img_array)
+            else:
+                self.q_array = None
+        else:
+            self.q_array = None
+            
         self.q = q
         self.Y = None
         self.Cb = None
@@ -96,7 +114,7 @@ class JPEG:
         
         functions = [codec.downscale_colors, codec.form_blocks, codec.calculate_blocked_dct, codec.quantize, codec.zigzag]
         kwargs = {"block_size": self.block_size, "q": self.q, "downsample_ratio": self.downsample_ratio, 
-                  "dynamic": self.dynamic, "q_array": self.q_array}
+                  "dynamic": self.dynamic, "q_array": self.q_array, "dMode": self.dMode}
         
         for f in functions[: max_step - 1]:
             self.process_channels(f, **kwargs)
