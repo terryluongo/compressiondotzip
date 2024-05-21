@@ -2,6 +2,8 @@
 
 ## A CSCI 0452 Project by Terry Luongo and Jiffy Lesica
 
+[Link to Github](https://github.com/terryluongo/compressiondotzip)
+
 ### **Introduction**:
 
 Over the course of this semester, we have grounded our study of image processing in understanding digital images as a multi-dimensional arrays of data: specifically pixel/channel values. While an image itself is defined from a two-dimensional function (Gonzalez, Digital Image Processing), the data structures and values within each array dimension can be manipulated to modify a local region of an image, or apply some universal transformation across the entire image. In essence, a digital image is dimensionally organized data which can be operated on so as to extract or change the information of an image itself.
